@@ -1,0 +1,114 @@
+<template>
+  <Tips/>
+  <view class="container" wx:if="{{init}}">
+    <!--操作表单-->
+    <view class="weui-cells-form">
+      <view class="weui-cell weui-cell_input">
+        <view class="weui-cell__bd">
+          <view class="weui-label">商品类型名称</view>
+        </view>
+        <view class="weui-cell__ft">
+          <input class="weui-input" name="categoryName" id="categoryName" value="{{input.categoryName}}"
+                  placeholder="请输入商品类型" @input="input" maxlength="10" />
+        </view>
+      </view>
+      <Switch title="是否显示商品类型" fieldName="isShow" :input.sync="input" switchFlag="1" />      
+      <view class="weui-cell weui-cell_switch">
+        <view class="weui-cell__bd">推荐类型</view>
+        <view class="weui-cell__ft">
+          <switch checked="{{input.isRecommend}}" id="isRecommend" @change="input" />
+        </view>
+      </view>
+    </view>
+    <!--操作栏-->
+    <ActionBar @tap.user="submit" />
+  </view>
+</template>
+
+<style lang="scss">
+  @import "../../styles/variable";
+</style>
+
+<script>
+  import wepy from 'wepy';
+  import base from '../../mixins/base';
+  import input from '../../mixins/input';
+  import auth from '../../api/auth';
+  import goods from '../../api/goods';
+  import Switch from '../../components/weui/switch';
+  import FormTips from '../../components/weui/tips';
+  import ActionBar from '../../components/common/action_bar';
+  import Tips from '../../utils/Tips';
+  import Event from '../../utils/Event';
+  export default class CategoryEdit extends wepy.page {
+    def = {
+      init: false,
+      mode: 'create'
+    };
+    data = { ...this.def
+    };
+    async onReady() {
+      wepy.setNavigationBarTitle({
+        title: this.title
+      })
+    };
+    async onLoad({
+      mode,
+      categoryId
+    }) {
+      this.mode = mode;
+      if (mode == 'create') {
+        this.title = '新增分类';
+        this.input.isShow = true;
+      } else if (mode == 'edit') {
+        this.title = '修改分类';
+        const category = await goods.getInnerCategorieId(categoryId);
+        if (category.type === 'RECOMMEND') {
+          category.isRecommend = true;
+        } else {
+          category.isRecommend = false;
+        }
+        this.input = category;
+      }
+      this.loaded();
+    };
+    methods = {
+      async submit() {
+        if (!this.validate()) {
+          return;
+        }
+        const form = this.input;
+        form.type = form.isRecommend ? 'RECOMMEND' : 'CUSTOM';
+        form.pid = 1;
+        form.seq = 0;
+        form.shopid = auth.getConfig('shop_id');
+        if (this.mode == 'create') {
+          await goods.addInnerCategories(form);
+          await Tips.success('创建成功');
+        } else {
+          await goods.updateInnerCategories(form);
+          await Tips.success('更新成功');
+        }
+        Event.emit(Event.CATEGORY_LIST_UPDATE);
+        wepy.navigateBack();
+      }
+    };
+    validate() {
+      const rules = [{
+        value: this.input.categoryName,
+        method: 'required',
+        message: '分类名称不能为空'
+      }];
+      return this.check(rules);
+    }
+    mixins = [base, input];
+    components = {
+      Tips: FormTips,
+      ActionBar: ActionBar,
+      Switch: Switch
+    };
+    config = {
+      navigationBarTitleText: ''
+    };
+  }
+</script>
